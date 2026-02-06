@@ -1,7 +1,7 @@
 # Anomaly Dataset Benchmark — Quick Start
 
 This repository provides a unified benchmarking framework for anomaly detection on cloud telemetry datasets.
-This README documents the Windows workflow for **a reconstruction-error–based training run**, followed by **optional likelihood tuning** as a post-processing step.
+This README documents the workflow for **a reconstruction-error–based training run**, followed by **optional likelihood tuning** as a post-processing step.
 
 ---
 
@@ -9,7 +9,7 @@ This README documents the Windows workflow for **a reconstruction-error–based 
 
 ### Execution environment
 
-All preprocessing, training, likelihood calibration, and evaluation were executed on a Windows 10 Desktop and also a Linux server in a Docker environment (tf-docker):
+All preprocessing, training, likelihood calibration, and evaluation were executed and validated across two environments—a Windows 10 desktop and a Linux server running a Docker-based setup (tf-docker)—to ensure reproducibility and consistency.
 
 Windows 10 Desktop:
 - **OS**: Windows 10
@@ -33,7 +33,7 @@ python --version
 
 #### Install dependencies
 
-Install the Windows-tested dependency set:
+With Windows-tested dependency set:
 
 ```bat
 pip install -r requirements_winsows_desktop.txt
@@ -56,7 +56,7 @@ source .venv/bin/activate
 
 #### Install dependencies
 
-Install the Linux server-tested dependency set:
+With Linux server-tested dependency set:
 
 ```bat
 pip install -r requirements.txt
@@ -125,7 +125,7 @@ output/prepared/<dataset>/
 output/plots/<dataset>/
 ```
 
-This stage may overwrite existing prepared files if enabled.
+This stage may overwrite existing prepared files if enabled in `config/config.yaml`.
 
 ### Stage 2 — Training and evaluation
 
@@ -138,8 +138,9 @@ All model-related outputs are written under:
 ```
 runs/
 ```
+  (e.g., `runs/nab/2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab/...`)
 
-Preparation is invoked automatically. Users do not need to run a separate preprocessing command.
+Preparation is invoked automatically based on configuration in `config/config.yaml`. Users do not need to run a separate preprocessing command.
 
 ---
 
@@ -188,25 +189,39 @@ model:
   val_ratio: 0.1
 ```
 
+
 ---
 
-## 4) Run preparation + training 
+## 4) Run preparation + training
 
-From the repository root:
+Experiments were primarily executed using the provided wrapper script, which ensures consistent logging and background execution.
 
-```bat
+### Recommended (wrapper script)
+
+From the repository root (Git Bash on Windows or Linux shell):
+
+./run_bg.sh --mode train --config config/config.yaml --tag gru_nab
+
+This command triggers a two-stage pipeline:
+
+- prepares the dataset from raw files (if steps.prep.enabled: true)
+- trains the selected model
+- computes reconstruction error
+- writes prepared artifacts and plots to `output/`
+- writes all model outputs and logs to `runs/`
+
+### Alternative (direct Python execution)
+
+If you prefer to run without the wrapper script:
+
 set PYTHONPATH=%CD%;%PYTHONPATH%
 python -m src.main --config config\config.yaml --tag prep_train
-```
 
-This command:
-
-- prepares the dataset from raw files
-- trains the selected model
-- evaluates reconstruction error
-- writes outputs to `output/` and `runs/`
+This executes the same pipeline and produces identical artifacts under `output/` and `runs/`.
 
 ---
+
+
 
 ## 5) Switching models
 
@@ -256,23 +271,26 @@ dir runs\nab
 
 Likelihood calibration parameters (short window, long window, threshold) are tuned **after model training**, using the per-series artifacts produced under `runs/`.
 
-Recommended directory name in the project root:
+Directory for likelihood tuning in the project root:
 
 ```
 likelihood_tuning/
 ```
 
 This tuning workflow:
-- reads `runs/<dataset>/<run_id>/series/`
+- reads `../runs/<dataset>/<run_id>/series/`
 - constructs subgroups under `working_data/subgroups/<dataset>/`
-- runs W&B sweeps to select likelihood parameters on the training split only
 
 Example usage:
 
 ```bat
-python likelihood_tuning\prep_subgroups.py ^
+cd likelihood_tuning
+prep_subgroups.py ^
   --series_dir "..\runs\nab\2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab\series"
 ```
+
+- runs W&B sweeps to select likelihood parameters on the training split only
+
 
 Example sweep commands:
 
@@ -364,4 +382,3 @@ Once tuning completed on traing split, tuned parameters are used to test the tes
 
 ---
 
-This README reflects the execution flow verified in the implementation logs and documents the repository to reconstruction-error–based run, with optional likelihood tuning as a separate post-processing step.
