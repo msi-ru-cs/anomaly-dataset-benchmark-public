@@ -1,0 +1,33 @@
+program: "lik_sweep_runner.py" 
+method: bayes 
+project: hyper_tune_aws
+entity: amirlab
+
+
+run_cap: 100 #100        # <---- THIS controls number of runs; 
+
+metric:
+  name: dataset_raw_sum
+  goal: maximize
+
+parameters:
+  # ----- Fixed context -----
+  series_dir:
+    value: "./working_data/subgroups/nab/artificialWithAnomaly"
+  profile:
+    value: standard
+  split_mode:         
+    value: train      # options: all, train, test
+
+  likelihood.short_window:
+    distribution: int_uniform
+    min: 3
+    max: 30
+  likelihood.long_window:
+    distribution: int_uniform
+    min: 70
+    max: 500
+  likelihood.threshold:
+    distribution: uniform
+    min: 0.9 
+    max: 0.9999

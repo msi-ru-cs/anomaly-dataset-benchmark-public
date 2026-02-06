@@ -1,0 +1,26 @@
+program: "lik_sweep_runner.py" 
+method: grid
+project: hyper_tune_aws
+entity: amirlab
+
+
+run_cap: 1         # <---- THIS controls number of runs
+
+metric:
+  name: dataset_raw_sum
+  goal: maximize
+
+parameters:
+  series_dir:
+    value: "./working_data/subgroups/nab/artificialWithAnomaly"
+  profile:
+    value: standard
+  split_mode:
+    value: test
+
+  likelihood.long_window:
+    value: 236
+  likelihood.short_window:
+    value: 28
+  likelihood.threshold:
+    value: 0.9950772703649864

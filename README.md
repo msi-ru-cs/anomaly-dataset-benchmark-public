@@ -144,7 +144,7 @@ Preparation is invoked automatically based on configuration in `config/config.ya
 
 ---
 
-## 3) Configuration (single-run setup)
+## 3) Configuration 
 
 The main experiment is controlled by `config/config.yaml`.
 
@@ -153,7 +153,7 @@ Key characteristics:
 - Unified model width and depth across architectures
 - Fixed 70/30 train–test split
 - Reconstruction-error–based detection
-- Single training run
+
 
 Example (key fields):
 
@@ -300,73 +300,74 @@ wandb agent amirlab/hyper_tune_aws/<sweep_id>
 ```
 
 **Example of `config/sweep_likelihood_tune.yaml`**
+```yaml
+program: "lik_sweep_runner.py" 
+method: bayes 
+project: hyper_tune_aws
+entity: amirlab
 
-    program: "lik_sweep_runner.py" 
-    method: bayes 
-    project: hyper_tune_aws
-    entity: amirlab
-    
-    
-    run_cap: 100 #100        # <---- THIS controls number of runs; 
-    
-    metric:
-      name: dataset_raw_sum
-      goal: maximize
-    
-    parameters:
-      # ----- Fixed context -----
-      series_dir:
-        value: "./working_data/subgroups/nab/artificialWithAnomaly"
-      profile:
-        value: standard
-      split_mode:         
-        value: train      # options: all, train, test
-    
-      likelihood.short_window:
-        distribution: int_uniform
-        min: 3
-        max: 30
-      likelihood.long_window:
-        distribution: int_uniform
-        min: 70
-        max: 500
-      likelihood.threshold:
-        distribution: uniform
-        min: 0.9 
-        max: 0.9999
 
+run_cap: 100 #100        # <---- THIS controls number of runs; 
+
+metric:
+  name: dataset_raw_sum
+  goal: maximize
+
+parameters:
+  # ----- Fixed context -----
+  series_dir:
+    value: "./working_data/subgroups/nab/artificialWithAnomaly"
+  profile:
+    value: standard
+  split_mode:         
+    value: train      # options: all, train, test
+
+  likelihood.short_window:
+    distribution: int_uniform
+    min: 3
+    max: 30
+  likelihood.long_window:
+    distribution: int_uniform
+    min: 70
+    max: 500
+  likelihood.threshold:
+    distribution: uniform
+    min: 0.9 
+    max: 0.9999
+
+```
 
 Once tuning completed on traing split, tuned parameters are used to test the test split.
 
 **Example of `config/sweep_likelihood_test.yaml`**
+```yaml
+program: "lik_sweep_runner.py" 
+method: grid
+project: hyper_tune_aws
+entity: amirlab
 
-    program: "lik_sweep_runner.py" 
-    method: grid
-    project: hyper_tune_aws
-    entity: amirlab
-    
-    
-    run_cap: 1         # <---- THIS controls number of runs
-    
-    metric:
-      name: dataset_raw_sum
-      goal: maximize
-    
-    parameters:
-      series_dir:
-        value: "./working_data/subgroups/nab/artificialWithAnomaly"
-      profile:
-        value: standard
-      split_mode:
-        value: test
-    
-      likelihood.long_window:
-        value: 236
-      likelihood.short_window:
-        value: 28
-      likelihood.threshold:
-        value: 0.9950772703649864
 
+run_cap: 1         # <---- THIS controls number of runs
+
+metric:
+  name: dataset_raw_sum
+  goal: maximize
+
+parameters:
+  series_dir:
+    value: "./working_data/subgroups/nab/artificialWithAnomaly"
+  profile:
+    value: standard
+  split_mode:
+    value: test
+
+  likelihood.long_window:
+    value: 236
+  likelihood.short_window:
+    value: 28
+  likelihood.threshold:
+    value: 0.9950772703649864
+```
 ---
 
 ## 8) Troubleshooting
