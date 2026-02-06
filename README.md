@@ -295,7 +295,7 @@ Example sweep commands:
 
 ```bat
 wandb sweep "$(pwd -W)/config/sweep_likelihood_tune.yaml"
-wandb agent amirlab/hyper_tune_aws/<sweep_id>
+wandb agent mylab/hyper_tune_aws/<sweep_id>
 ```
 
 **Example of `config/sweep_likelihood_tune.yaml`**
@@ -303,7 +303,7 @@ wandb agent amirlab/hyper_tune_aws/<sweep_id>
 program: "lik_sweep_runner.py" 
 method: bayes 
 project: hyper_tune_aws
-entity: amirlab
+entity: mylab
 
 
 run_cap: 100 #100        # <---- THIS controls number of runs; 
@@ -342,7 +342,7 @@ Once tuning completed on traing split, tuned parameters are used to test the tes
 program: "lik_sweep_runner.py" 
 method: grid
 project: hyper_tune_aws
-entity: amirlab
+entity: mylab
 
 
 run_cap: 1         # <---- THIS controls number of runs
