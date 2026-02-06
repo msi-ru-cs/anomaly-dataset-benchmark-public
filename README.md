@@ -1,19 +1,19 @@
-# Anomaly Dataset Benchmark — Windows Quick Start
+# Anomaly Dataset Benchmark — Quick Start
 
 This repository provides a unified benchmarking framework for anomaly detection on cloud telemetry datasets.
-This README documents the Windows workflow for **a single reconstruction-error–based training run**, followed by **optional likelihood tuning** as a post-processing step.
+This README documents the Windows workflow for **a reconstruction-error–based training run**, followed by **optional likelihood tuning** as a post-processing step.
 
 ---
 
-## 0) Environment setup (Windows)
+## 0) Environment setup
 
 ### Execution environment
 
 All preprocessing, training, likelihood calibration, and evaluation were executed on a Windows 10 Desktop and also a Linux server in a Docker environment (tf-docker):
 
 Windows 10 Desktop:
-- **Windows 10**
-- **Python 3.12.7**
+- **OS**: Windows 10
+- **Python**: 3.12.7
 
 Linux server:
 - **OS**: Ubuntu 20.04.5 LTS
@@ -31,12 +31,18 @@ python -m venv .venv
 python --version
 ```
 
-## Install dependencies
+#### Install dependencies
 
 Install the Windows-tested dependency set:
 
 ```bat
 pip install -r requirements_winsows_desktop.txt
+```
+
+Verify key packages:
+
+```bat
+pip list | findstr "tensorflow numpy pandas scikit-learn scipy hydra-core"
 ```
 
 
@@ -48,7 +54,7 @@ source .venv/bin/activate
     pip install -r requirements.txt
 
 
-## Install dependencies
+#### Install dependencies
 
 Install the Linux server-tested dependency set:
 
@@ -100,6 +106,15 @@ Running the training command triggers a **two-stage pipeline**.
 ### Stage 1 — Preparation
 
 - Raw data are read from `data/`
+
+```
+data/
+├── nab/
+└── microsoft/
+├── exathlon/
+└── ibm/
+```
+
 - Dataset-specific preprocessing is applied
 - Prepared CSVs and dataset-level plots are generated
 
@@ -175,7 +190,7 @@ model:
 
 ---
 
-## 4) Run preparation + training (Windows)
+## 4) Run preparation + training 
 
 From the repository root:
 
@@ -256,7 +271,7 @@ Example usage:
 
 ```bat
 python likelihood_tuning\prep_subgroups.py ^
-  --series_dir "runs\nab\2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab\series"
+  --series_dir "..\runs\nab\2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab\series"
 ```
 
 Example sweep commands:
@@ -349,4 +364,4 @@ Once tuning completed on traing split, tuned parameters are used to test the tes
 
 ---
 
-This README reflects the Windows execution flow verified in the implementation logs and documents the repository up to a single reconstruction-error–based run, with optional likelihood tuning as a separate post-processing step.
+This README reflects the execution flow verified in the implementation logs and documents the repository to reconstruction-error–based run, with optional likelihood tuning as a separate post-processing step.
