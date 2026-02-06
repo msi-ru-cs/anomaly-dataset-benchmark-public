@@ -285,8 +285,7 @@ Example usage:
 
 ```bat
 cd likelihood_tuning
-prep_subgroups.py ^
-  --series_dir "..\runs\nab\2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab\series"
+python prep_subgroups.py --series_dir "..\runs\nab\2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab\series"
 ```
 
 - runs W&B sweeps to select likelihood parameters on the training split only
@@ -295,7 +294,7 @@ prep_subgroups.py ^
 Example sweep commands:
 
 ```bat
-wandb sweep likelihood_tuning\config\sweep_likelihood_tune.yaml
+wandb sweep "$(pwd -W)/config/sweep_likelihood_tune.yaml"
 wandb agent amirlab/hyper_tune_aws/<sweep_id>
 ```
 
@@ -334,7 +333,6 @@ parameters:
     distribution: uniform
     min: 0.9 
     max: 0.9999
-
 ```
 
 Once tuning completed on traing split, tuned parameters are used to test the test split.
