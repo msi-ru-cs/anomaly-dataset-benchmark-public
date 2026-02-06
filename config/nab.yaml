@@ -1,0 +1,3 @@
+nab:
+  data_dir: ${paths.raw_root}/nab/data
+  label_file: ${paths.raw_root}/nab/labels/combined_windows.json

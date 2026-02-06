@@ -1,0 +1,23 @@
+defaults:
+  - nab
+  - ms
+  - exa            # <-- NEW: loads exathlon block above
+  - ibm
+  - _self_
+
+hydra:
+  job:
+    chdir: false
+
+dataset:
+  name: nab #exathlon #ms #nab  #ibm     # nab  ← switch here or via CLI to: exathlon
+  kind: time_series
+
+paths:
+  raw_root: data
+  prepared_root: output/prepared/${dataset.name}
+
+# used by src/main.py during preprocess
+prepared_dir: ${paths.prepared_root}
+
+action: preprocess

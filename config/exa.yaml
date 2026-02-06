@@ -1,0 +1,6 @@
+# config/exa.yaml
+exathlon:
+  data_dir: ${paths.raw_root}/exathlon/data
+  label_dir: ${paths.raw_root}/exathlon/labels/ground_truth_normalized.csv
+  mode: multivariate #univariate
+  timestamp_cols: ["t", "timestamp", "time", "ts"]

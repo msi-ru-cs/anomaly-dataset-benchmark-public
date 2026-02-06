@@ -1,0 +1,111 @@
+# config/config.yaml — unified width/depth across models
+# Notes:
+# - Flip dataset.name between "nab" and "ms".
+# - prepared_dir is derived from dataset.name so trainers pick the right folder.
+# - We standardize: model.hidden = 32, model.layers = 4 for GRU/TCN/TSMixer/Transformer.
+# - Transformer: ensure hidden % heads == 0 (32 % 4 == 0 ✅).
+# - Validation: set val_ratio=0.1 to enable early stopping on val_loss; use 0.0 to disable.
+
+dataset:
+  # Change this per dataset ("nab" or "ms")
+  name: nab  #nab #exathlon #ms #nab #ibm                       # <- set to "ms" for Microsoft dataset
+  # If prep is disabled, this folder must already contain labeled CSVs
+  # For NAB it becomes output/prepared/nab ; for MS it becomes output/prepared/ms
+  prepared_dir: output/prepared/${dataset.name}
+
+steps:
+  prep:
+    enabled: true   #false                # true = run prep stage; false = skip (use prepared_dir as-is)
+    overwrite: false               # true = re-run prep even if prepared_dir already has CSVs
+
+output:
+  dir: runs
+  # Tag follows the dataset automatically (e.g., "nab_tf", "ms_tf")
+  tag: ${dataset.name}_tf
+  overall_summary_filename: overall_Summary.csv
+  aggregate_filename: aggregate.json
+
+  # Diagnostics/Artifacts
+  save_last_features: true         # write x_<feature> at t_idx (raw scale)
+  save_scaled_features: false      # also write z_<feature> at t_idx (scaled)
+  save_window_npz: false           # optionally dump full windows as .npz
+
+split:
+  train_ratio: 0.7
+  seq_len: 8                       # short window; fine for NAB and MS univariate; adjust if needed
+  step: 1
+
+scaler:
+  kind: minmax                     # or: standard
+  clip_value: null
+
+# Root-level detector (if any codepath reads it directly; reporting also has its own)
+detector: err
+
+model:
+  framework: tf                    # reserved for future switching; trainer here is TF
+  name: gru_ae                # switch to: gru_ae | tcn | transformer | tsmixer | isoforest
+  hidden: 32                       # unified width across all models
+  layers: 4                        # unified depth across all models
+  dropout: 0.1                     # small regularization; set 0.0 if you want pure baseline
+  lr: 1.0e-3
+  loss: mse                        # mse | mae
+  batch_size: 32
+  epochs: 30
+  val_ratio: 0.1                   # last 10% of clean train windows used for validation; use 0.0 to disable
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.0
+    monitor: auto                  # auto -> val_loss if val available, else loss
+    mode: min
+  checkpoint: true                 # save best model (Keras format) to run_dir/checkpoints
+
+# Model-specific knobs (kept minimal; unified layers/hidden up top)
+tcn:
+  kernel_size: 3                   # with dilation_base=2 and layers=4 → receptive field ≈ 31 (> seq_len=8)
+  dilation_base: 2
+
+transformer:
+  heads: 4                         # keep hidden % heads == 0 (32 % 4 == 0)
+  ff_mult: 4                       # feed-forward width multiplier
+
+tsmixer:
+  time_mlp: 128                    # widen for high-dim datasets (e.g., channel_mlp: 256)
+  channel_mlp: 128
+
+isoforest:
+  n_estimators: 300
+  max_samples: auto        # can be "auto", int, or float
+  contamination: auto      # keep "auto" for unsupervised; or try 0.01 / 0.05 later
+  max_features: 1.0
+  random_state: 42
+  n_jobs: -1
+
+scoring:
+  use_percentile: false            # keep false → we won't use percentile
+  mode: stddev                     # mean ± k·std from train
+  std_k: 4.0                       # k in μ ± k·σ
+  two_sided: true                  # true → flag both tails; false → only high errors
+  threshold: 0.5                   # kept for backward-compat when mode != stddev
+
+  # # isoforest
+  # use_percentile: true            # keep true → isoforest
+  # threshold: 0.99                 
+
+likelihood:
+  long_window: 400
+  short_window: 10
+  threshold: 0.9996                # high threshold → fewer positives from likelihood
+
+mahalanobis:
+  threshold_percentile: 0.999      # strict; reduce to 0.99 for more sensitivity
+
+report:
+  detector: err                    # err | lik | md (which prediction column to score)
+  anomalies_only: false            # include all series
+  # NAB application profiles below; safe to keep for MS as generic weights.
+  profiles:
+    standard: { w_tp: 1.0, w_fp: 0.11, w_fn: 1.0 }
+    low_fn:   { w_tp: 1.0, w_fp: 0.11, w_fn: 2.0 }
+    low_fp:   { w_tp: 1.0, w_fp: 0.22, w_fn: 1.0 }

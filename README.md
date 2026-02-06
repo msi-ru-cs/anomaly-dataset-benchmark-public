@@ -1,2 +1,352 @@
-# anomaly-dataset-benchmark-public
-Anomaly dataset benchmark repository
+# Anomaly Dataset Benchmark — Windows Quick Start
+
+This repository provides a unified benchmarking framework for anomaly detection on cloud telemetry datasets.
+This README documents the Windows workflow for **a single reconstruction-error–based training run**, followed by **optional likelihood tuning** as a post-processing step.
+
+---
+
+## 0) Environment setup (Windows)
+
+### Execution environment
+
+All preprocessing, training, likelihood calibration, and evaluation were executed on a Windows 10 Desktop and also a Linux server in a Docker environment (tf-docker):
+
+Windows 10 Desktop:
+- **Windows 10**
+- **Python 3.12.7**
+
+Linux server:
+- **OS**: Ubuntu 20.04.5 LTS
+- **Python**: 3.8.10
+
+
+
+### Create and activate a virtual environment from the repository root:
+
+**Windows**
+
+```bat
+python -m venv .venv
+. .venv\Scripts\activate
+python --version
+```
+
+## Install dependencies
+
+Install the Windows-tested dependency set:
+
+```bat
+pip install -r requirements_winsows_desktop.txt
+```
+
+
+**macOS/Linux**
+```bat
+python -m venv .venv
+source .venv/bin/activate
+```
+    pip install -r requirements.txt
+
+
+## Install dependencies
+
+Install the Linux server-tested dependency set:
+
+```bat
+pip install -r requirements.txt
+```
+
+
+
+
+Verify key packages:
+
+```bat
+pip list | findstr "tensorflow numpy pandas scikit-learn scipy hydra-core"
+```
+
+---
+
+## 1) Folder expectations
+
+Before running, ensure raw datasets are available locally and paths are correctly set in `config/prep.yaml`.
+
+Typical expectations:
+
+- Raw NAB CSVs:
+  `config/prep.yaml -> nab.data_dir`
+  (e.g., `data/NAB/data/...`)
+- NAB labels JSON:
+  `config/prep.yaml -> nab.label_file`
+  (e.g., `data/NAB/labels/labels.json`)
+- Raw Microsoft CSVs:
+  `config/prep.yaml -> microsoft.data_dir`
+  (e.g., `data/microsoft/...`)
+
+Prepared data and dataset-level plots are written automatically under:
+
+```
+output/
+├── prepared/
+└── plots/
+```
+
+---
+
+## 2) Execution pipeline
+
+Running the training command triggers a **two-stage pipeline**.
+
+### Stage 1 — Preparation
+
+- Raw data are read from `data/`
+- Dataset-specific preprocessing is applied
+- Prepared CSVs and dataset-level plots are generated
+
+Outputs:
+
+```
+output/prepared/<dataset>/
+output/plots/<dataset>/
+```
+
+This stage may overwrite existing prepared files if enabled.
+
+### Stage 2 — Training and evaluation
+
+- Models are trained using prepared data
+- Reconstruction error is computed
+- Evaluation artifacts are generated
+
+All model-related outputs are written under:
+
+```
+runs/
+```
+
+Preparation is invoked automatically. Users do not need to run a separate preprocessing command.
+
+---
+
+## 3) Configuration (single-run setup)
+
+The main experiment is controlled by `config/config.yaml`.
+
+Key characteristics:
+
+- Unified model width and depth across architectures
+- Fixed 70/30 train–test split
+- Reconstruction-error–based detection
+- Single training run
+
+Example (key fields):
+
+```yaml
+dataset:
+  name: nab
+  prepared_dir: output/prepared/${dataset.name}
+
+steps:
+  prep:
+    enabled: true
+    overwrite: false
+
+output:
+  dir: runs
+  tag: ${dataset.name}_tf
+
+split:
+  train_ratio: 0.7
+  seq_len: 8
+  step: 1
+
+scaler:
+  kind: minmax
+
+model:
+  framework: tf
+  name: gru_ae
+  hidden: 32
+  layers: 4
+  batch_size: 32
+  epochs: 30
+  val_ratio: 0.1
+```
+
+---
+
+## 4) Run preparation + training (Windows)
+
+From the repository root:
+
+```bat
+set PYTHONPATH=%CD%;%PYTHONPATH%
+python -m src.main --config config\config.yaml --tag prep_train
+```
+
+This command:
+
+- prepares the dataset from raw files
+- trains the selected model
+- evaluates reconstruction error
+- writes outputs to `output/` and `runs/`
+
+---
+
+## 5) Switching models
+
+Change the model by editing a single field in `config/config.yaml`:
+
+```yaml
+model:
+  name: gru_ae
+```
+
+Supported models:
+
+- `gru_ae`
+- `tcn`
+- `transformer`
+- `tsmixer`
+- `isolation_forest`
+
+Isolation Forest serves as a non-neural baseline and follows the same training and evaluation flow.
+
+---
+
+## 6) Outputs and logs
+
+All run artifacts are placed under:
+
+```
+runs/<DATASET>/<TIMESTAMP>__<MODEL>__seq<SEQ>_bs<BATCH>_<SCALER>[__<TAG>]/
+```
+
+Common contents (example):
+
+- `checkpoints/`
+- `series/`
+- `_debug.log`
+- `training_log.csv`
+
+Quick sanity checks:
+
+```bat
+dir runs\nab
+```
+
+---
+
+## 7) Likelihood tuning (post-processing)
+
+Likelihood calibration parameters (short window, long window, threshold) are tuned **after model training**, using the per-series artifacts produced under `runs/`.
+
+Recommended directory name in the project root:
+
+```
+likelihood_tuning/
+```
+
+This tuning workflow:
+- reads `runs/<dataset>/<run_id>/series/`
+- constructs subgroups under `working_data/subgroups/<dataset>/`
+- runs W&B sweeps to select likelihood parameters on the training split only
+
+Example usage:
+
+```bat
+python likelihood_tuning\prep_subgroups.py ^
+  --series_dir "runs\nab\2026-02-06_10-38-06__TF_GRU_AE__seq8_bs32_minmax__gru_nab\series"
+```
+
+Example sweep commands:
+
+```bat
+wandb sweep likelihood_tuning\config\sweep_likelihood_tune.yaml
+wandb agent amirlab/hyper_tune_aws/<sweep_id>
+```
+
+**Example of `config/sweep_likelihood_tune.yaml`**
+
+    program: "lik_sweep_runner.py" 
+    method: bayes 
+    project: hyper_tune_aws
+    entity: amirlab
+    
+    
+    run_cap: 100 #100        # <---- THIS controls number of runs; 
+    
+    metric:
+      name: dataset_raw_sum
+      goal: maximize
+    
+    parameters:
+      # ----- Fixed context -----
+      series_dir:
+        value: "./working_data/subgroups/nab/artificialWithAnomaly"
+      profile:
+        value: standard
+      split_mode:         
+        value: train      # options: all, train, test
+    
+      likelihood.short_window:
+        distribution: int_uniform
+        min: 3
+        max: 30
+      likelihood.long_window:
+        distribution: int_uniform
+        min: 70
+        max: 500
+      likelihood.threshold:
+        distribution: uniform
+        min: 0.9 
+        max: 0.9999
+
+
+Once tuning completed on traing split, tuned parameters are used to test the test split.
+
+**Example of `config/sweep_likelihood_test.yaml`**
+
+    program: "lik_sweep_runner.py" 
+    method: grid
+    project: hyper_tune_aws
+    entity: amirlab
+    
+    
+    run_cap: 1         # <---- THIS controls number of runs
+    
+    metric:
+      name: dataset_raw_sum
+      goal: maximize
+    
+    parameters:
+      series_dir:
+        value: "./working_data/subgroups/nab/artificialWithAnomaly"
+      profile:
+        value: standard
+      split_mode:
+        value: test
+    
+      likelihood.long_window:
+        value: 236
+      likelihood.short_window:
+        value: 28
+      likelihood.threshold:
+        value: 0.9950772703649864
+
+---
+
+## 8) Troubleshooting
+
+- **Configs not found**
+  Run from repo root and ensure `config\` exists.
+- **Prepared data missing**
+  Verify raw paths in `config/prep.yaml`.
+- **Unexpected number of trained series**
+  Check `output/prepared/<dataset>/manifest.json`.
+- **Transformer errors**
+  Ensure `model.hidden % transformer.heads == 0`.
+
+---
+
+This README reflects the Windows execution flow verified in the implementation logs and documents the repository up to a single reconstruction-error–based run, with optional likelihood tuning as a separate post-processing step.

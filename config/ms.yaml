@@ -1,0 +1,3 @@
+ms:
+  data_dir: ${paths.raw_root}/microsoft   # e.g., data/microsoft
+  # no label_file for MS; labels are inside each CSV
