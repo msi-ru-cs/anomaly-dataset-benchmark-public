@@ -11,7 +11,7 @@ Sweep config example (sweep.yaml):
 program: "lik_sweep_runner.py"
 method: bayes
 project: hyper_tune_aws
-entity: amirlab
+entity: mylab
 
 metric:
   name: dataset_raw_sum
