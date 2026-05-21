@@ -1,5 +1,8 @@
 # Anomaly Dataset Benchmark — Quick Start
 
+[![arXiv](https://img.shields.io/badge/arXiv-2411.09047-b31b1b.svg)](https://arxiv.org/abs/2602.13288)
+![python](https://img.shields.io/badge/python-3.12.7-blue.svg)
+
 This repository provides a unified benchmarking framework for anomaly detection on cloud telemetry datasets.
 This README documents the workflow for **a reconstruction-error–based training run**, followed by **optional likelihood tuning** as a post-processing step.
 
