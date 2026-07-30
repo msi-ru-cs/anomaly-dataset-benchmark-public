@@ -1,10 +1,16 @@
+"""
+Original linear NAB implementation retained for comparison.
+
+The benchmark currently uses the sigmoid implementation in nab_eval.py,
+which matches the likelihood tuning scorer.
+"""
+
 # src/metrics/nab_eval.py
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Optional
 import numpy as np
 import pandas as pd
-import math
 
 @dataclass
 class NabProfile:
@@ -48,45 +54,15 @@ def _earliest_detection_in_window(gt: Tuple[int,int], pred_pos_idx: np.ndarray) 
             return int(t)
     return None
 
-def _tp_weight(s: int, e: int, t: int, w_tp: float) -> float:
-    """Sigmoid TP reward matching the tuning formula, using t_idx units."""
-    L = max(float(e - s), 1e-9)
-    y = float(t - s)
-
-    k = 6.0 / L
-    sig = 1.0 / (1.0 + math.exp(k * y))
-    val = w_tp * min(1.0, 2.0 * sig)
-
-    return max(0.0, min(w_tp, val))
-
-
-def _fp_weight(d: float, L: float, w_fp: float) -> float:
-    """
-    Sigmoid FP penalty matching the tuning formula.
-
-    Config keeps w_fp positive; convert it internally to negative A_fp.
-    """
-    A_fp = -float(w_fp)
-
-    L = max(float(L), 1e-9)
-    k = 6.0 / L
-    sig = 1.0 / (1.0 + math.exp(-k * d))
-    val = A_fp * (2.0 * sig - 1.0)
-
-    return min(0.0, max(A_fp, val))
-    
-def _nearest_boundary_distance(
-    t: int,
-    windows: List[Tuple[int, int]],
-) -> float:
-    """Distance in t_idx units to the nearest GT-window boundary."""
-    best = None
-
-    for s, e in windows:
-        d = min(abs(float(t - s)), abs(float(t - e)))
-        best = d if best is None or d < best else best
-
-    return 0.0 if best is None else float(best)
+def _linear_reward(s: int, e: int, t: int) -> float:
+    """Reward in [0,1] where 1 at s, 0 at e (linear decay)."""
+    if e <= s:
+        return 1.0 if t <= s else 0.0
+    if t <= s:
+        return 1.0
+    if t >= e:
+        return 0.0
+    return 1.0 - (t - s) / float(e - s)
 
 def _event_counts(gt_windows: List[Tuple[int,int]], pred_windows: List[Tuple[int,int]]) -> Dict[str,int]:
     tp = 0
@@ -118,25 +94,18 @@ def nab_score(
     profile: NabProfile = NabProfile()
 ) -> Dict[str, float]:
     """
-    Compute normalized NAB-like score.
-
-    - Sigmoid reward for the earliest detection in each GT window.
-    - Sigmoid FP penalty for every predicted point outside GT windows.
-    - FN penalty for missed GT windows.
-
-    Uses t_idx distances (rather than timestamps) for the sigmoid calculation.
+    Compute normalized NAB-like score:
+      - Reward earliest detection inside each GT window with linear earliness.
+      - FP penalty for any predicted index not inside any GT window (counted once per predicted *event*).
+      - FN penalty for any GT window without detection.
+    Normalization: (S_algo - S_null) / (S_opt - S_null)
     """
-
-    window_lengths = [
-        max(float(e - s), 1e-9)
-        for s, e in gt_windows
-    ]
-
-    avg_window_length = (
-        float(np.mean(window_lengths))
-        if window_lengths
-        else 1.0
-    )
+    # Precompute predicted windows from indices
+    if pred_pos_idx.size == 0:
+        pred_windows = []
+    else:
+        ones = np.ones_like(pred_pos_idx, dtype=int)
+        pred_windows = _group_events(pred_pos_idx, ones)
 
     # Raw algorithm score
     S_algo = 0.0
@@ -146,28 +115,11 @@ def nab_score(
         if t is None:
             S_algo -= profile.w_fn
         else:
-            S_algo += _tp_weight(
-                s=g[0],
-                e=g[1],
-                t=t,
-                w_tp=profile.w_tp,
-            )
-
-    # FP penalty for every predicted point outside all GT windows
-    for t in pred_pos_idx:
-        t = int(t)
-
-        if any(s <= t <= e for s, e in gt_windows):
-            continue
-
-        d = _nearest_boundary_distance(t, gt_windows)
-
-        # _fp_weight() returns a negative value, so add it.
-        S_algo += _fp_weight(
-            d=d,
-            L=avg_window_length,
-            w_fp=profile.w_fp,
-        )
+            S_algo += profile.w_tp * _linear_reward(g[0], g[1], t)
+    # FP penalties (one per predicted window that doesn't overlap any GT)
+    for p in pred_windows:
+        if not any(_overlaps(p, g) for g in gt_windows):
+            S_algo -= profile.w_fp
 
     # Null score: never detect (all FNs)
     S_null = - profile.w_fn * float(len(gt_windows))
