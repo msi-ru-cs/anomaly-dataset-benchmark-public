@@ -82,7 +82,7 @@ def main():
                 pred_err = (errs >= thr).astype(int)
                 err_src = "fixed"
         # ---- pred_lik
-        pred_lik = (lik >= lik_thr).astype(int)
+        pred_lik = (lik > lik_thr).astype(int) # aligned with Tuning code
         # ---- pred_md
         md_thr = float(np.percentile(tr_md, 100*md_pct)) if tr_md.size else float(np.percentile(md, 100*md_pct))
         pred_md = (md >= md_thr).astype(int)
