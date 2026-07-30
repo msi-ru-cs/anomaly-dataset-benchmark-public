@@ -100,12 +100,32 @@ def nab_score(
       - FN penalty for any GT window without detection.
     Normalization: (S_algo - S_null) / (S_opt - S_null)
     """
-    # Precompute predicted windows from indices
-    if pred_pos_idx.size == 0:
-        pred_windows = []
-    else:
-        ones = np.ones_like(pred_pos_idx, dtype=int)
-        pred_windows = _group_events(pred_pos_idx, ones)
+
+    # Build predicted windows from consecutive positive indices
+    pred_windows = []
+
+    if pred_pos_idx.size > 0:
+        start = int(pred_pos_idx[0])
+        previous = start
+
+        for value in pred_pos_idx[1:]:
+            current = int(value)
+
+            # Gap -> end current event
+            if current != previous + 1:
+                pred_windows.append((start, previous))
+                start = current
+
+            previous = current
+
+        pred_windows.append((start, previous))
+
+    # # Precompute predicted windows from indices
+    # if pred_pos_idx.size == 0:
+    #     pred_windows = []
+    # else:
+    #     ones = np.ones_like(pred_pos_idx, dtype=int)
+    #     pred_windows = _group_events(pred_pos_idx, ones)
 
     # Raw algorithm score
     S_algo = 0.0
